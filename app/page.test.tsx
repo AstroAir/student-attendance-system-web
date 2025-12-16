@@ -2,86 +2,34 @@ import { render, screen } from "@testing-library/react";
 import Home from "./page";
 
 describe("Home Page", () => {
-  it("renders the Next.js logo", () => {
+  it("renders the dashboard heading", () => {
     render(<Home />);
-    const logo = screen.getByAltText("Next.js logo");
-    expect(logo).toBeInTheDocument();
-  });
-
-  it("renders the main heading", () => {
-    render(<Home />);
-    const heading = screen.getByRole("heading", {
-      name: /to get started, edit the page\.tsx file/i,
-    });
+    const heading = screen.getByRole("heading", { name: "仪表盘" });
     expect(heading).toBeInTheDocument();
   });
 
-  it("renders the description text", () => {
+  it("renders navigation cards", () => {
     render(<Home />);
-    const description = screen.getByText(/looking for a starting point/i);
-    expect(description).toBeInTheDocument();
-  });
 
-  it("renders the Templates link", () => {
-    render(<Home />);
-    const templatesLink = screen.getByRole("link", { name: /templates/i });
-    expect(templatesLink).toBeInTheDocument();
-    expect(templatesLink).toHaveAttribute(
+    expect(screen.getByRole("link", { name: /学生管理/ })).toHaveAttribute(
       "href",
-      expect.stringContaining("vercel.com/templates")
+      "/students"
     );
-  });
-
-  it("renders the Learning link", () => {
-    render(<Home />);
-    const learningLink = screen.getByRole("link", { name: /learning/i });
-    expect(learningLink).toBeInTheDocument();
-    expect(learningLink).toHaveAttribute(
+    expect(screen.getByRole("link", { name: /考勤记录/ })).toHaveAttribute(
       "href",
-      expect.stringContaining("nextjs.org/learn")
+      "/attendances"
     );
-  });
-
-  it("renders the Deploy Now button", () => {
-    render(<Home />);
-    const deployButton = screen.getByRole("link", { name: /deploy now/i });
-    expect(deployButton).toBeInTheDocument();
-    expect(deployButton).toHaveAttribute(
+    expect(screen.getByRole("link", { name: /统计报表/ })).toHaveAttribute(
       "href",
-      expect.stringContaining("vercel.com/new")
+      "/reports"
     );
-    expect(deployButton).toHaveAttribute("target", "_blank");
-    expect(deployButton).toHaveAttribute("rel", "noopener noreferrer");
-  });
-
-  it("renders the Documentation button", () => {
-    render(<Home />);
-    const docsButton = screen.getByRole("link", { name: /documentation/i });
-    expect(docsButton).toBeInTheDocument();
-    expect(docsButton).toHaveAttribute(
+    expect(screen.getByRole("link", { name: /班级管理/ })).toHaveAttribute(
       "href",
-      expect.stringContaining("nextjs.org/docs")
+      "/classes"
     );
-    expect(docsButton).toHaveAttribute("target", "_blank");
-    expect(docsButton).toHaveAttribute("rel", "noopener noreferrer");
-  });
-
-  it("renders the Vercel logomark", () => {
-    render(<Home />);
-    const vercelLogo = screen.getByAltText("Vercel logomark");
-    expect(vercelLogo).toBeInTheDocument();
-  });
-
-  it("has correct layout structure", () => {
-    const { container } = render(<Home />);
-    const main = container.querySelector("main");
-    expect(main).toBeInTheDocument();
-    expect(main).toHaveClass("flex", "min-h-screen");
-  });
-
-  it("applies dark mode classes", () => {
-    const { container } = render(<Home />);
-    const wrapper = container.firstChild as HTMLElement;
-    expect(wrapper).toHaveClass("dark:bg-black");
+    expect(screen.getByRole("link", { name: /数据导入导出/ })).toHaveAttribute(
+      "href",
+      "/data"
+    );
   });
 });

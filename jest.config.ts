@@ -217,6 +217,7 @@ const config: Config = {
     "/node_modules/",
     "/.next/",
     "/out/",
+    "/e2e/",
     "/src-tauri/",
   ],
 

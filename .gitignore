@@ -17,6 +17,10 @@ junit.xml
 *.test.ts.snap
 *.test.tsx.snap
 
+/test-results/
+/playwright-report/
+/blob-report/
+
 # next.js
 /.next/
 /out/

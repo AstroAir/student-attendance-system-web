@@ -9,7 +9,7 @@ import React from 'react';
 // Mock Next.js Image component
 jest.mock('next/image', () => ({
   __esModule: true,
-  default: (props: any) => {
+  default: (props: React.ComponentProps<'img'>) => {
     // eslint-disable-next-line jsx-a11y/alt-text
     return React.createElement('img', props);
   },

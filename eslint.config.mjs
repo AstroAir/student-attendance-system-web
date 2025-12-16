@@ -12,7 +12,13 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    "src-tauri/target/**",
   ]),
+  {
+    linterOptions: {
+      reportUnusedDisableDirectives: "off",
+    },
+  },
 ]);
 
 export default eslintConfig;

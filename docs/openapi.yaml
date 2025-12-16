@@ -1,0 +1,1194 @@
+openapi: 3.0.3
+info:
+  title: 学生考勤系统 API
+  description: |
+    大学生考勤系统 RESTful API 接口规范。
+    
+    ## 考勤状态符号
+    | 符号 | 状态 | 标识 |
+    |------|------|------|
+    | √ | 出勤 | present |
+    | X | 旷课 | absent |
+    | △ | 事假 | personal_leave |
+    | ○ | 病假 | sick_leave |
+    | + | 迟到 | late |
+    | – | 早退 | early_leave |
+  version: 1.0.0
+  contact:
+    name: API Support
+  license:
+    name: MIT
+
+servers:
+  - url: http://localhost:8080/api/v1
+    description: 本地开发服务器
+
+tags:
+  - name: students
+    description: 学生管理
+  - name: attendances
+    description: 考勤记录管理
+  - name: reports
+    description: 统计报表
+  - name: data
+    description: 数据导入导出
+  - name: classes
+    description: 班级管理
+
+paths:
+  # ==================== 学生管理 ====================
+  /students:
+    get:
+      tags:
+        - students
+      summary: 获取学生列表
+      description: 获取所有学生信息，支持分页、排序和筛选
+      operationId: getStudents
+      parameters:
+        - name: page
+          in: query
+          description: 页码
+          schema:
+            type: integer
+            default: 1
+            minimum: 1
+        - name: page_size
+          in: query
+          description: 每页数量
+          schema:
+            type: integer
+            default: 20
+            minimum: 1
+            maximum: 100
+        - name: sort_by
+          in: query
+          description: 排序字段
+          schema:
+            type: string
+            enum: [student_id, name, class]
+        - name: order
+          in: query
+          description: 排序方向
+          schema:
+            type: string
+            enum: [asc, desc]
+            default: asc
+        - name: class
+          in: query
+          description: 按班级筛选
+          schema:
+            type: string
+        - name: keyword
+          in: query
+          description: 按学号或姓名模糊搜索
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 成功获取学生列表
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/StudentListResponse'
+    post:
+      tags:
+        - students
+      summary: 新增学生
+      description: 创建新的学生记录，学号不可重复
+      operationId: createStudent
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StudentCreate'
+      responses:
+        '201':
+          description: 学生创建成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Student'
+        '409':
+          description: 学号已存在
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /students/{student_id}:
+    get:
+      tags:
+        - students
+      summary: 获取单个学生信息
+      operationId: getStudent
+      parameters:
+        - $ref: '#/components/parameters/StudentId'
+      responses:
+        '200':
+          description: 成功获取学生信息
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Student'
+        '404':
+          description: 学生不存在
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    put:
+      tags:
+        - students
+      summary: 修改学生信息
+      operationId: updateStudent
+      parameters:
+        - $ref: '#/components/parameters/StudentId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StudentUpdate'
+      responses:
+        '200':
+          description: 学生信息更新成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Student'
+        '404':
+          description: 学生不存在
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    delete:
+      tags:
+        - students
+      summary: 删除学生
+      operationId: deleteStudent
+      parameters:
+        - $ref: '#/components/parameters/StudentId'
+      responses:
+        '204':
+          description: 删除成功
+        '404':
+          description: 学生不存在
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  # ==================== 考勤记录管理 ====================
+  /attendances:
+    get:
+      tags:
+        - attendances
+      summary: 获取考勤记录列表
+      description: 获取考勤记录，支持多种筛选条件
+      operationId: getAttendances
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: page_size
+          in: query
+          schema:
+            type: integer
+            default: 20
+        - name: student_id
+          in: query
+          description: 按学号筛选
+          schema:
+            type: string
+        - name: name
+          in: query
+          description: 按姓名筛选
+          schema:
+            type: string
+        - name: class
+          in: query
+          description: 按班级筛选
+          schema:
+            type: string
+        - name: date
+          in: query
+          description: 按日期筛选（MM-DD）
+          schema:
+            type: string
+            pattern: '^\d{2}-\d{2}$'
+        - name: start_date
+          in: query
+          description: 开始日期（MM-DD）
+          schema:
+            type: string
+            pattern: '^\d{2}-\d{2}$'
+        - name: end_date
+          in: query
+          description: 结束日期（MM-DD）
+          schema:
+            type: string
+            pattern: '^\d{2}-\d{2}$'
+        - name: status
+          in: query
+          description: 考勤状态筛选
+          schema:
+            $ref: '#/components/schemas/AttendanceStatus'
+        - name: sort_by
+          in: query
+          schema:
+            type: string
+            enum: [student_id, name, date]
+        - name: order
+          in: query
+          schema:
+            type: string
+            enum: [asc, desc]
+            default: asc
+      responses:
+        '200':
+          description: 成功获取考勤记录列表
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/AttendanceListResponse'
+    post:
+      tags:
+        - attendances
+      summary: 新增考勤记录
+      operationId: createAttendance
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AttendanceCreate'
+      responses:
+        '201':
+          description: 考勤记录创建成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Attendance'
+
+  /attendances/batch:
+    post:
+      tags:
+        - attendances
+      summary: 批量新增考勤记录
+      operationId: batchCreateAttendances
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AttendanceBatchCreate'
+      responses:
+        '201':
+          description: 批量创建成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          created_count:
+                            type: integer
+                            description: 创建的记录数
+
+  /attendances/{id}:
+    get:
+      tags:
+        - attendances
+      summary: 获取单条考勤记录
+      operationId: getAttendance
+      parameters:
+        - $ref: '#/components/parameters/AttendanceId'
+      responses:
+        '200':
+          description: 成功获取考勤记录
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Attendance'
+        '404':
+          description: 考勤记录不存在
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    put:
+      tags:
+        - attendances
+      summary: 修改考勤记录
+      operationId: updateAttendance
+      parameters:
+        - $ref: '#/components/parameters/AttendanceId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AttendanceUpdate'
+      responses:
+        '200':
+          description: 考勤记录更新成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Attendance'
+        '404':
+          description: 考勤记录不存在
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    delete:
+      tags:
+        - attendances
+      summary: 删除考勤记录
+      operationId: deleteAttendance
+      parameters:
+        - $ref: '#/components/parameters/AttendanceId'
+      responses:
+        '204':
+          description: 删除成功
+        '404':
+          description: 考勤记录不存在
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  # ==================== 统计报表 ====================
+  /reports/details:
+    get:
+      tags:
+        - reports
+      summary: 考勤明细表
+      description: 获取指定时间段内的考勤明细
+      operationId: getAttendanceDetails
+      parameters:
+        - name: start_date
+          in: query
+          required: true
+          description: 开始日期（MM-DD）
+          schema:
+            type: string
+            pattern: '^\d{2}-\d{2}$'
+        - name: end_date
+          in: query
+          required: true
+          description: 结束日期（MM-DD）
+          schema:
+            type: string
+            pattern: '^\d{2}-\d{2}$'
+        - name: class
+          in: query
+          schema:
+            type: string
+        - name: student_id
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 成功获取考勤明细
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/AttendanceDetailsReport'
+
+  /reports/daily:
+    get:
+      tags:
+        - reports
+      summary: 考勤日报表
+      description: 获取指定日期的考勤统计
+      operationId: getDailyReport
+      parameters:
+        - name: date
+          in: query
+          required: true
+          description: 日期（MM-DD）
+          schema:
+            type: string
+            pattern: '^\d{2}-\d{2}$'
+        - name: class
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 成功获取日报表
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/DailyReport'
+
+  /reports/summary:
+    get:
+      tags:
+        - reports
+      summary: 考勤汇总表
+      description: 获取指定时间段内的考勤汇总统计
+      operationId: getSummaryReport
+      parameters:
+        - name: start_date
+          in: query
+          required: true
+          schema:
+            type: string
+            pattern: '^\d{2}-\d{2}$'
+        - name: end_date
+          in: query
+          required: true
+          schema:
+            type: string
+            pattern: '^\d{2}-\d{2}$'
+        - name: class
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 成功获取汇总表
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/SummaryReport'
+
+  /reports/abnormal:
+    get:
+      tags:
+        - reports
+      summary: 考勤异常表
+      description: 获取考勤异常记录（旷课、迟到、早退）
+      operationId: getAbnormalReport
+      parameters:
+        - name: start_date
+          in: query
+          required: true
+          schema:
+            type: string
+            pattern: '^\d{2}-\d{2}$'
+        - name: end_date
+          in: query
+          required: true
+          schema:
+            type: string
+            pattern: '^\d{2}-\d{2}$'
+        - name: class
+          in: query
+          schema:
+            type: string
+        - name: type
+          in: query
+          description: 异常类型
+          schema:
+            type: string
+            enum: [absent, late, early_leave]
+      responses:
+        '200':
+          description: 成功获取异常表
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/AbnormalReport'
+
+  /reports/leave:
+    get:
+      tags:
+        - reports
+      summary: 请假汇总表
+      description: 获取请假记录汇总
+      operationId: getLeaveReport
+      parameters:
+        - name: start_date
+          in: query
+          required: true
+          schema:
+            type: string
+            pattern: '^\d{2}-\d{2}$'
+        - name: end_date
+          in: query
+          required: true
+          schema:
+            type: string
+            pattern: '^\d{2}-\d{2}$'
+        - name: class
+          in: query
+          schema:
+            type: string
+        - name: type
+          in: query
+          description: 请假类型
+          schema:
+            type: string
+            enum: [personal_leave, sick_leave]
+      responses:
+        '200':
+          description: 成功获取请假汇总表
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/LeaveReport'
+
+  # ==================== 数据导入导出 ====================
+  /data/export:
+    get:
+      tags:
+        - data
+      summary: 导出数据
+      operationId: exportData
+      parameters:
+        - name: type
+          in: query
+          required: true
+          description: 导出类型
+          schema:
+            type: string
+            enum: [students, attendances, all]
+        - name: format
+          in: query
+          description: 导出格式
+          schema:
+            type: string
+            enum: [json, csv]
+            default: json
+      responses:
+        '200':
+          description: 成功导出数据
+          content:
+            application/json:
+              schema:
+                type: object
+            text/csv:
+              schema:
+                type: string
+
+  /data/import:
+    post:
+      tags:
+        - data
+      summary: 导入数据
+      operationId: importData
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - file
+                - type
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: 数据文件（JSON 或 CSV）
+                type:
+                  type: string
+                  enum: [students, attendances]
+                  description: 导入类型
+      responses:
+        '200':
+          description: 导入成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/ImportResult'
+
+  # ==================== 班级管理 ====================
+  /classes:
+    get:
+      tags:
+        - classes
+      summary: 获取班级列表
+      operationId: getClasses
+      responses:
+        '200':
+          description: 成功获取班级列表
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/ClassInfo'
+
+  /classes/{class_name}/students:
+    get:
+      tags:
+        - classes
+      summary: 获取班级学生列表
+      operationId: getClassStudents
+      parameters:
+        - name: class_name
+          in: path
+          required: true
+          description: 班级名称
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 成功获取班级学生列表
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          class:
+                            type: string
+                          students:
+                            type: array
+                            items:
+                              $ref: '#/components/schemas/StudentBasic'
+
+components:
+  parameters:
+    StudentId:
+      name: student_id
+      in: path
+      required: true
+      description: 学号
+      schema:
+        type: string
+    AttendanceId:
+      name: id
+      in: path
+      required: true
+      description: 考勤记录ID
+      schema:
+        type: integer
+
+  schemas:
+    # ==================== 通用响应 ====================
+    ApiResponse:
+      type: object
+      properties:
+        code:
+          type: integer
+          description: 响应码
+          example: 200
+        message:
+          type: string
+          description: 响应消息
+          example: success
+
+    ErrorResponse:
+      type: object
+      properties:
+        code:
+          type: integer
+          description: 错误码
+          example: 400
+        message:
+          type: string
+          description: 错误消息
+        errors:
+          type: array
+          items:
+            type: object
+            properties:
+              field:
+                type: string
+              message:
+                type: string
+
+    # ==================== 考勤状态枚举 ====================
+    AttendanceStatus:
+      type: string
+      enum:
+        - present
+        - absent
+        - personal_leave
+        - sick_leave
+        - late
+        - early_leave
+      description: |
+        考勤状态:
+        * `present` - 出勤 (√)
+        * `absent` - 旷课 (X)
+        * `personal_leave` - 事假 (△)
+        * `sick_leave` - 病假 (○)
+        * `late` - 迟到 (+)
+        * `early_leave` - 早退 (–)
+
+    # ==================== 学生相关 ====================
+    Student:
+      type: object
+      properties:
+        student_id:
+          type: string
+          description: 学号（唯一）
+          example: "2024001"
+        name:
+          type: string
+          description: 姓名
+          example: "张三"
+        class:
+          type: string
+          description: 班级
+          example: "人文2401班"
+
+    StudentBasic:
+      type: object
+      properties:
+        student_id:
+          type: string
+          example: "2024001"
+        name:
+          type: string
+          example: "张三"
+
+    StudentCreate:
+      type: object
+      required:
+        - student_id
+        - name
+        - class
+      properties:
+        student_id:
+          type: string
+          description: 学号（唯一，不可重复）
+          example: "2024001"
+        name:
+          type: string
+          description: 姓名
+          example: "张三"
+        class:
+          type: string
+          description: 班级
+          example: "人文2401班"
+
+    StudentUpdate:
+      type: object
+      properties:
+        name:
+          type: string
+          description: 姓名
+        class:
+          type: string
+          description: 班级
+
+    StudentListResponse:
+      type: object
+      properties:
+        total:
+          type: integer
+          description: 总数
+        page:
+          type: integer
+          description: 当前页码
+        page_size:
+          type: integer
+          description: 每页数量
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Student'
+
+    # ==================== 考勤相关 ====================
+    Attendance:
+      type: object
+      properties:
+        id:
+          type: integer
+          description: 记录ID
+          example: 1
+        student_id:
+          type: string
+          description: 学号
+          example: "2024001"
+        name:
+          type: string
+          description: 姓名
+          example: "张三"
+        class:
+          type: string
+          description: 班级
+          example: "人文2401班"
+        date:
+          type: string
+          description: 考勤日期（MM-DD）
+          example: "12-15"
+        status:
+          $ref: '#/components/schemas/AttendanceStatus'
+        status_symbol:
+          type: string
+          description: 考勤状态符号
+          example: "√"
+        remark:
+          type: string
+          description: 备注
+          example: ""
+
+    AttendanceCreate:
+      type: object
+      required:
+        - student_id
+        - date
+        - status
+      properties:
+        student_id:
+          type: string
+          description: 学号
+          example: "2024001"
+        date:
+          type: string
+          description: 考勤日期（MM-DD）
+          example: "12-15"
+        status:
+          $ref: '#/components/schemas/AttendanceStatus'
+        remark:
+          type: string
+          description: 备注
+
+    AttendanceBatchCreate:
+      type: object
+      required:
+        - date
+        - records
+      properties:
+        date:
+          type: string
+          description: 考勤日期（MM-DD）
+          example: "12-15"
+        records:
+          type: array
+          items:
+            type: object
+            required:
+              - student_id
+              - status
+            properties:
+              student_id:
+                type: string
+              status:
+                $ref: '#/components/schemas/AttendanceStatus'
+
+    AttendanceUpdate:
+      type: object
+      properties:
+        status:
+          $ref: '#/components/schemas/AttendanceStatus'
+        remark:
+          type: string
+
+    AttendanceListResponse:
+      type: object
+      properties:
+        total:
+          type: integer
+        page:
+          type: integer
+        page_size:
+          type: integer
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Attendance'
+
+    # ==================== 报表相关 ====================
+    DatePeriod:
+      type: object
+      properties:
+        start_date:
+          type: string
+          example: "12-01"
+        end_date:
+          type: string
+          example: "12-15"
+
+    AttendanceDetailsReport:
+      type: object
+      properties:
+        period:
+          $ref: '#/components/schemas/DatePeriod'
+        records:
+          type: array
+          items:
+            type: object
+            properties:
+              student_id:
+                type: string
+              name:
+                type: string
+              class:
+                type: string
+              attendance_details:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    date:
+                      type: string
+                    status:
+                      $ref: '#/components/schemas/AttendanceStatus'
+                    symbol:
+                      type: string
+
+    DailyReport:
+      type: object
+      properties:
+        date:
+          type: string
+          example: "12-15"
+        summary:
+          type: object
+          properties:
+            total_students:
+              type: integer
+            present:
+              type: integer
+            absent:
+              type: integer
+            late:
+              type: integer
+            early_leave:
+              type: integer
+            personal_leave:
+              type: integer
+            sick_leave:
+              type: integer
+            attendance_rate:
+              type: string
+              example: "90.00%"
+        details:
+          type: array
+          items:
+            type: object
+            properties:
+              student_id:
+                type: string
+              name:
+                type: string
+              class:
+                type: string
+              status:
+                $ref: '#/components/schemas/AttendanceStatus'
+              symbol:
+                type: string
+
+    SummaryReport:
+      type: object
+      properties:
+        period:
+          $ref: '#/components/schemas/DatePeriod'
+        summary:
+          type: array
+          items:
+            type: object
+            properties:
+              student_id:
+                type: string
+              name:
+                type: string
+              class:
+                type: string
+              total_days:
+                type: integer
+              present_count:
+                type: integer
+              absent_count:
+                type: integer
+              late_count:
+                type: integer
+              early_leave_count:
+                type: integer
+              personal_leave_count:
+                type: integer
+              sick_leave_count:
+                type: integer
+              attendance_rate:
+                type: string
+
+    AbnormalReport:
+      type: object
+      properties:
+        period:
+          $ref: '#/components/schemas/DatePeriod'
+        abnormal_records:
+          type: array
+          items:
+            type: object
+            properties:
+              student_id:
+                type: string
+              name:
+                type: string
+              class:
+                type: string
+              date:
+                type: string
+              status:
+                $ref: '#/components/schemas/AttendanceStatus'
+              symbol:
+                type: string
+              remark:
+                type: string
+        statistics:
+          type: object
+          properties:
+            total_abnormal:
+              type: integer
+            absent_count:
+              type: integer
+            late_count:
+              type: integer
+            early_leave_count:
+              type: integer
+
+    LeaveReport:
+      type: object
+      properties:
+        period:
+          $ref: '#/components/schemas/DatePeriod'
+        leave_records:
+          type: array
+          items:
+            type: object
+            properties:
+              student_id:
+                type: string
+              name:
+                type: string
+              class:
+                type: string
+              date:
+                type: string
+              type:
+                type: string
+                enum: [personal_leave, sick_leave]
+              symbol:
+                type: string
+              remark:
+                type: string
+        statistics:
+          type: object
+          properties:
+            total_leave:
+              type: integer
+            personal_leave_count:
+              type: integer
+            sick_leave_count:
+              type: integer
+
+    # ==================== 其他 ====================
+    ClassInfo:
+      type: object
+      properties:
+        name:
+          type: string
+          description: 班级名称
+          example: "人文2401班"
+        student_count:
+          type: integer
+          description: 学生人数
+          example: 50
+
+    ImportResult:
+      type: object
+      properties:
+        imported_count:
+          type: integer
+          description: 成功导入数量
+        skipped_count:
+          type: integer
+          description: 跳过数量
+        errors:
+          type: array
+          items:
+            type: object
+            properties:
+              line:
+                type: integer
+              message:
+                type: string
